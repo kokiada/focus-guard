@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'">
+  <title>Focus Guard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="task-layout.css">
+</head>
+<body>
+  <div class="window-bar"><div class="drag-area"></div><div class="window-actions"><button data-window="minimize" data-icon="minus" title="最小化" aria-label="最小化"></button><button data-window="maximize" data-icon="maximize" title="最大化・元に戻す" aria-label="最大化・元に戻す"></button><button data-window="close" data-icon="close" title="閉じる" aria-label="閉じる"></button></div></div>
+  <aside class="sidebar">
+    <div class="brand"><img class="brand-icon" src="../assets/icon.png" width="39" height="39" alt=""><span>Focus Guard</span></div>
+    <nav aria-label="メインメニュー">
+      <button class="nav active" data-page="focus"><span data-icon="list"></span> タスク</button>
+      <button class="nav" data-page="history"><span data-icon="clock"></span> 履歴</button>
+    </nav>
+  </aside>
+  <main>
+    <header><div><div class="eyebrow" id="date"></div><h1 id="page-title">タスク</h1></div><button id="export" class="icon-button" data-icon="download" title="ログをエクスポート" aria-label="ログをエクスポート"></button></header>
+    <div id="error" class="notice error" role="alert" hidden></div>
+    <div id="storage-error" class="notice error" role="alert" hidden></div>
+    <div id="focus-page">
+      <section id="session-panel" class="session-panel" hidden>
+        <div class="session-top"><span class="eyebrow" id="session-status">作業中</span></div>
+        <h2 id="session-name"></h2><div class="timer" id="timer">00:00:00</div>
+        <div class="session-actions"><button id="pause" class="primary icon-button" data-icon="pause" title="一時停止" aria-label="一時停止"></button><button id="suspend" class="secondary icon-button" data-icon="switch" title="中断して別の作業へ" aria-label="中断して別の作業へ"></button><button id="end" class="secondary icon-button" data-icon="stop" title="作業を終了" aria-label="作業を終了"></button><label class="toggle"><input id="overlay-toggle" type="checkbox" checked> 右下に表示</label></div>
+      </section>
+      <section id="suspended-panel" class="card" hidden><div class="section-header"><h2>中断中</h2></div><div id="suspended-list"></div></section>
+      <div class="workspace">
+        <section class="card tasks-card"><div class="section-header"><label class="search-box"><span data-icon="search"></span><input id="task-search" type="search" placeholder="検索" aria-label="タスクを検索"></label><span id="task-count" class="count">0</span><button id="new-task" class="primary icon-button" data-icon="plus" title="タスクを追加" aria-label="タスクを追加"></button></div><div class="tabs"><button id="open-tasks" class="tab active">未完了</button><button id="done-tasks" class="tab">完了</button></div><div id="tag-filters" class="tag-filters" aria-label="タグで絞り込み"></div><div class="list-heading"><span>タスク</span><span>タグ</span><span></span></div><div id="tasks"></div></section>
+        <section class="card setup-card" id="setup"><span class="setup-label">選択中</span><h2 id="selected-task">タスクを選択</h2><div id="selected-tags" class="selected-tags"></div><button id="start" class="primary start" data-icon="play" title="作業を開始" aria-label="作業を開始" disabled></button></section>
+      </div>
+    </div>
+    <section id="history-page" hidden><div class="stats"><div class="card"><small>合計時間</small><strong id="total-time">0分</strong></div><div class="card"><small>セッション</small><strong id="total-sessions">0</strong></div><div class="card"><small>完了タスク</small><strong id="total-tasks">0</strong></div></div><div class="card"><div class="section-header"><h2>最近の記録</h2><span class="hint">直近100件</span></div><div id="history"></div></div></section>
+  </main>
+  <dialog id="task-dialog"><form id="task-form"><h2 id="task-dialog-title">タスクを追加</h2><label for="task-name">タスク名</label><input id="task-name" placeholder="例: 企画書の構成を考える" maxlength="120" required><label for="task-tags">タグ</label><input id="task-tags" placeholder="仕事, 個人" maxlength="260" aria-describedby="tags-hint"><small id="tags-hint" class="hint">カンマ区切り・10個まで</small><div id="tag-suggestions" class="tag-suggestions"></div><label for="task-memo">メモ <span class="hint">任意</span></label><textarea id="task-memo" rows="4" maxlength="4000" placeholder="メモを追加"></textarea><div class="dialog-actions"><button type="button" id="cancel-task" class="secondary">キャンセル</button><button class="primary">保存</button></div></form></dialog>
+  <div id="toast" role="status" hidden></div>
+  <script src="icons.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

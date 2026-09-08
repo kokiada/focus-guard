@@ -1,0 +1,20 @@
+{
+  "name": "focus-guard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ローカルファーストのWindows集中支援アプリ",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "test:ui": "node test/smoke.cjs",
+    "package:update": "electron-packager . FocusGuard --platform=win32 --arch=x64 --icon=assets/icon.ico --out=dist/update --overwrite --ignore=^/test --ignore=^/dist --ignore=^/FocusGuard-win32-x64 --ignore=^/.test-data",
+    "check": "node --check src/main.cjs && node --check src/core.cjs && node --check src/renderer.js && node --check src/overlay.js && node --check src/preload.cjs",
+    "package": "electron-packager . FocusGuard --platform=win32 --arch=x64 --icon=assets/icon.ico --out=dist --overwrite --ignore=^/test --ignore=^/dist --ignore=^/.test-data"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.2.0",
+    "playwright": "^1.63.0"
+  }
+}

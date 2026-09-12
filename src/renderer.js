@@ -2,7 +2,7 @@ const $ = id => document.getElementById(id);
 let state, selected = null, completed = false, editing = null, toastTimer, tagFilter = null, search = '';
 const icon = window.uiIcon;
 const allTags = () => [...new Set(state.tasks.flatMap(t => t.tags || []))].sort((a, b) => a.localeCompare(b, 'ja'));
-const tagMarkup = tag => `<span class="task-tag">${escapeHTML(tag)}</span>`;
+const tagMarkup = tag => { const color=state?.tags?.[tag]||'#7b9080'; return `<span class="task-tag" style="border-left:3px solid ${color}">${escapeHTML(tag)}</span>`; };
 function visibleTasks() { return state.tasks.filter(t => t.completed === completed && (tagFilter === null || (tagFilter === '' ? !(t.tags || []).length : (t.tags || []).includes(tagFilter))) && [t.name, t.memo, ...(t.tags || [])].join(' ').toLocaleLowerCase().includes(search.toLocaleLowerCase())); }
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const duration = seconds => [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60].map(v => String(v).padStart(2, '0')).join(':');
@@ -20,7 +20,7 @@ function renderTasks() {
   const tasks = visibleTasks();
   $('tag-filters').innerHTML = [{name: 'すべて', value: null}, {name: 'タグなし', value: ''}, ...allTags().map(name => ({name, value: name}))].map((t, index) => '<button class="filter-chip ' + (tagFilter === t.value ? 'active' : '') + '" data-filter-index="' + index + '" aria-pressed="' + (tagFilter === t.value) + '">' + escapeHTML(t.name) + '</button>').join('');
   $('task-count').textContent = tasks.length;
-  $('tasks').innerHTML = tasks.length ? tasks.map(t => `<div class="task-row ${t.id === selected ? 'selected' : ''} ${t.completed ? 'done' : ''}"><button class="task-check ${t.completed ? 'checked' : ''}" data-action="complete" data-id="${t.id}" aria-label="${t.completed ? '未完了に戻す' : 'タスクを完了'}" ${state.active?.task_id === t.id || state.suspended.some(s => s.task_id === t.id) ? 'disabled' : ''}>${t.completed ? '✓' : ''}</button><button class="task-content" data-action="select" data-id="${t.id}"><strong>${escapeHTML(t.name)}</strong>${t.memo ? `<small>${escapeHTML(t.memo)}</small>` : ''}</button><div class="row-tags">${(t.tags || []).map(tagMarkup).join('')}</div><div class="task-tools"><button data-action="edit" data-id="${t.id}" aria-label="タスクを編集" title="編集">${icon('edit')}</button><button data-action="delete" data-id="${t.id}" title="削除" aria-label="タスクを削除" ${state.active?.task_id === t.id || state.suspended.some(s => s.task_id === t.id) ? 'disabled' : ''}>${icon('trash')}</button></div></div>`).join('') : `<div class="empty"><div class="empty-symbol">${completed ? '✓' : '＋'}</div>${search || tagFilter !== null ? '該当するタスクはありません' : completed ? '完了したタスクはありません' : 'タスクを追加してください'}</div>`;
+  $('tasks').innerHTML = tasks.length ? tasks.map(t => `<div class="task-row ${t.id === selected ? 'selected' : ''} ${t.completed ? 'done' : ''}"><button class="task-check ${t.completed ? 'checked' : ''}" data-action="complete" data-id="${t.id}" aria-label="${t.completed ? '未完了に戻す' : 'タスクを完了'}" ${state.active?.task_id === t.id || state.suspended.some(s => s.task_id === t.id) ? 'disabled' : ''}>${t.completed ? '✓' : ''}</button><button class="task-content" data-action="select" data-id="${t.id}"><strong>${escapeHTML(t.name)}</strong>${t.memo ? `<small>${escapeHTML(t.memo)}</small>` : ''}</button><div class="row-tags">${(t.tags || []).map(tagMarkup).join('')}<select class="next-action" data-action="next-action" data-id="${t.id}" title="着手順"><option value="later" ${t.next_action==='later'?'selected':''}>保留</option><option value="next" ${t.next_action==='next'?'selected':''}>次にやる</option><option value="now" ${t.next_action==='now'?'selected':''}>今やる</option></select><span class="priority-dot" title="${t.priority?.important?'重要':''}${t.priority?.urgent?'・緊急':''}">${t.priority?.important?'◆':''}${t.priority?.urgent?'!':''}</span></div><div class="task-tools"><button data-action="edit" data-id="${t.id}" aria-label="タスクを編集" title="編集">${icon('edit')}</button><button data-action="delete" data-id="${t.id}" title="削除" aria-label="タスクを削除" ${state.active?.task_id === t.id || state.suspended.some(s => s.task_id === t.id) ? 'disabled' : ''}>${icon('trash')}</button></div></div>`).join('') : `<div class="empty"><div class="empty-symbol">${completed ? '✓' : '＋'}</div>${search || tagFilter !== null ? '該当するタスクはありません' : completed ? '完了したタスクはありません' : 'タスクを追加してください'}</div>`;
 }
 const eventLabels = { session_started: '作業を開始', session_paused: '一時停止', session_resumed: '作業を再開', session_suspended: '作業を中断', session_completed: '作業を終了', distraction: '寄り道の記録', app_added: 'アプリを追加', task_completed: 'タスクを完了' };
 function renderHistory() {
@@ -28,6 +28,8 @@ function renderHistory() {
   $('total-time').textContent = `${Math.floor(seconds / 3600)}時間 ${Math.floor(seconds / 60) % 60}分`;
   $('total-sessions').textContent = state.sessions.length;
   $('total-tasks').textContent = state.tasks.filter(t => t.completed).length;
+  const daily = {}; state.events.filter(e => e.event_type === 'task_completed').forEach(e => { const day = e.timestamp.slice(0,10); (daily[day] ||= []).push(e.task_name || state.tasks.find(t=>t.id===e.task_id)?.name || '削除済みタスク'); });
+  $('daily-completions').innerHTML = Object.keys(daily).sort().reverse().slice(0,14).map(day => `<div class=\"daily-row\"><time>${new Date(day+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'})}</time><strong>${daily[day].length}件</strong><span>${daily[day].map(escapeHTML).join('、')}</span></div>`).join('') || '<div class=\"daily-empty\">完了したタスクはまだありません</div>';
   $('history').innerHTML = state.events.length ? state.events.slice(-100).reverse().map(e => {
     const task = state.tasks.find(t => t.id === e.task_id)?.name || state.sessions.find(s => s.id === e.session_id)?.task_name || e.task_name || '削除済みタスク';
     const detail = [task, e.opened_app || e.app, e.reason_category, e.reason_text, e.duration_seconds != null ? duration(e.duration_seconds) : null].filter(Boolean).join(' · ');
@@ -56,7 +58,7 @@ function render() {
   $('session-panel').hidden = !state.active;
   $('focus-page').classList.toggle('has-session', !!state.active);
   if (state.active) {
-    $('session-name').textContent = state.active.task_name;
+    $('session-name').textContent = state.active.task_name; $('first-step').textContent = state.active.first_step ? '最初の一歩：' + state.active.first_step : ''; 
     $('timer').textContent = duration(state.elapsed_seconds);
     $('pause').innerHTML = icon(state.active.status === 'running' ? 'pause' : 'play');
     $('pause').title = state.active.status === 'running' ? '一時停止' : '作業を再開';
@@ -66,12 +68,14 @@ function render() {
   }
   $('storage-error').hidden = !state.storage_error;
   $('storage-error').textContent = state.storage_error;
+  $('quick-note-panel').hidden=!state.active;
+  renderMatrix();
 
 }
 function openTask(task = null) {
   editing = task?.id || null;
   $('task-dialog-title').textContent = task ? 'タスクを編集' : 'タスクを追加';
-  $('task-name').value = task?.name || ''; $('task-memo').value = task?.memo || '';
+  $('task-name').value = task?.name || ''; $('task-memo').value = task?.memo || ''; $('task-first-step').value = task?.first_step || ''; $('task-links').value = task?.links?.map(x=>x.url).join(', ') || '';
   $('task-tags').value = (task?.tags || []).join(', ');
   $('tag-suggestions').innerHTML = allTags().map((tag, index) => `<button type="button" data-tag-index="${index}" class="filter-chip">${escapeHTML(tag)}</button>`).join('');
   $('task-dialog').showModal(); $('task-name').focus();
@@ -81,7 +85,7 @@ $('new-task').onclick = () => openTask();
 $('cancel-task').onclick = () => { $('task-dialog').close(); render(); };
 $('task-form').onsubmit = async event => {
   event.preventDefault();
-  const result = await call(editing ? 'task:edit' : 'task:create', { id: editing, name: $('task-name').value, memo: $('task-memo').value, tags: $('task-tags').value });
+  const result = await call(editing ? 'task:edit' : 'task:create', { id: editing, name: $('task-name').value, memo: $('task-memo').value, tags: $('task-tags').value, first_step: $('task-first-step').value, links: $('task-links').value.split(/[,;\n]+/).filter(Boolean).map(url=>({url:url.trim()})) });
   if (result) { $('task-dialog').close(); if (!editing) { selected = state.tasks[0].id; tagFilter = null; search = ''; $('task-search').value = ''; completed = false; $('open-tasks').classList.add('active'); $('done-tasks').classList.remove('active'); } render(); }
 };
 $('tasks').onclick = async event => {
@@ -90,6 +94,8 @@ $('tasks').onclick = async event => {
   if (button.dataset.action === 'select') { if (!t.completed) { selected = id; render(); } }
   if (button.dataset.action === 'edit') openTask(t);
   if (button.dataset.action === 'complete') await call('task:complete', { id });
+  if (button.dataset.action === 'next-action') { await call('task:next-action',{id,value:button.value}); return; }
+  if (button.dataset.action === 'priority') await call('task:priority',{id,important:!t.priority?.important,urgent:t.priority?.urgent});
   if (button.dataset.action === 'delete' && confirm(`「${t.name}」を削除しますか？ 作業ログは残ります。`)) await call('task:delete', { id });
 };
 for (const [id, value] of [['open-tasks', false], ['done-tasks', true]]) $(id).onclick = () => { completed = value; $('open-tasks').classList.toggle('active', !value); $('done-tasks').classList.toggle('active', value); render(); };
@@ -113,3 +119,10 @@ $('task-search').addEventListener('input', event => { search = event.target.valu
 $('tag-filters').onclick = event => { const b = event.target.closest('[data-filter-index]'); if (b) { tagFilter = [null, '', ...allTags()][Number(b.dataset.filterIndex)]; render(); } };
 $('tag-suggestions').onclick = event => { const b = event.target.closest('[data-tag-index]'); if (!b) return; const values = $('task-tags').value.split(/[,、\n]+/).map(t => t.trim()).filter(Boolean); const tag = allTags()[Number(b.dataset.tagIndex)]; if (tag && !values.includes(tag)) values.push(tag); $('task-tags').value = values.join(', '); };
 document.querySelectorAll('[data-window]').forEach(button => button.onclick = () => window.focusGuard.call('window:' + button.dataset.window));
+
+$('quick-note-panel').hidden=!state?.active; $('quick-note-form').onsubmit=async e=>{e.preventDefault();if(await call('quick-note:add',{text:$('quick-note-text').value}))$('quick-note-text').value='';};
+
+function renderMatrix(){const box=$('matrix-grid');if(!box)return;const cells=[['true,true','今すぐやる'],['true,false','計画してやる'],['false,true','短時間で処理'],['false,false','保留候補']];box.innerHTML=cells.map(([key,label])=>{const [i,u]=key.split(',').map(v=>v==='true');const ts=state.tasks.filter(t=>!t.completed&&!!t.priority?.important===i&&!!t.priority?.urgent===u);return `<div class="matrix-cell" data-important="${i}" data-urgent="${u}"><small>${label}</small>${ts.map(t=>`<button class="matrix-task" draggable="true" data-matrix-id="${t.id}">${escapeHTML(t.name)}</button>`).join('')}</div>`}).join('');} 
+$('matrix-grid').onclick=event=>{const b=event.target.closest('[data-matrix-id]');if(!b)return;const c=b.parentElement;call('task:priority',{id:b.dataset.matrixId,important:c.dataset.important==='true',urgent:c.dataset.urgent==='true'});};
+
+$('matrix-grid').addEventListener('dragstart',e=>{const b=e.target.closest('[data-matrix-id]');if(b)e.dataTransfer.setData('text/plain',b.dataset.matrixId);}); $('matrix-grid').addEventListener('dragover',e=>{if(e.target.closest('.matrix-cell'))e.preventDefault();}); $('matrix-grid').addEventListener('drop',e=>{e.preventDefault();const cell=e.target.closest('.matrix-cell'),id=e.dataTransfer.getData('text/plain');if(cell&&id)call('task:priority',{id,important:cell.dataset.important==='true',urgent:cell.dataset.urgent==='true'});});

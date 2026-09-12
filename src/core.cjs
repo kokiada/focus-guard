@@ -1,4 +1,4 @@
-const fs = require('node:fs');
+﻿const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
@@ -6,6 +6,8 @@ function required(value, max = 120) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) throw Error(`1〜${max}文字で入力してください。`);
   return value.trim();
 }
+const TAG_COLORS = ['#5b8def','#d978a8','#e3a23b','#58a889','#936bd6','#db6f5f','#4f9ca8','#8d9b68'];
+function links(value = []) { if (!Array.isArray(value)) return []; return value.map(x => ({id:x.id || randomUUID(), title:String(x.title||'').trim().slice(0,100), url:String(x.url||'').trim()})).filter(x=>x.url).map(x=>{ let u; try {u=new URL(x.url)} catch {throw Error('リンクURLが正しくありません。')} if(!['http:','https:'].includes(u.protocol)) throw Error('リンクはhttpまたはhttpsで入力してください。'); return x; }); }
 function tags(value = []) {
   const values = Array.isArray(value) ? value : String(value).split(/[,、\n]+/);
   const result = [...new Set(values.map(v => String(v).trim()).filter(Boolean))];
@@ -20,7 +22,7 @@ class Store {
     fs.mkdirSync(directory, { recursive: true });
     this.data = fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : { version: 1, tasks: [], sessions: [], events: [], active: null, pending: null, settings: { overlay: true } };
     if (this.data.version !== 1 || !Array.isArray(this.data.tasks) || !Array.isArray(this.data.events)) throw Error('保存データの形式を読み取れません。');
-    this.data.suspended ??= [];
+    this.data.suspended ??= []; this.data.quick_notes ??= []; this.data.tags ??= {}; for (const t of this.data.tasks) { t.tags ??= []; t.links ??= []; t.priority ??= {important:false,urgent:false}; t.first_step ??= ''; t.next_action ??= 'later'; }
     // Retain old logs, but settle any pending detection once when upgrading.
     if (this.data.pending) this.transaction(() => this.finishDistraction({ action: 'monitoring_removed' }, this.data.active?.heartbeat || this.clock()));
     if (this.data.active?.status === 'running') {
@@ -51,12 +53,12 @@ class Store {
   active() { if (!this.data.active) throw Error('作業は開始されていません。'); return this.data.active; }
   createTask(input) {
     const t = { id: randomUUID(), name: required(input.name), memo: String(input.memo || '').slice(0, 4000), completed: false, created_at: this.iso(), updated_at: this.iso(), completed_at: null };
-    t.tags = tags(input.tags);
+    t.tags = tags(input.tags); t.links = links(input.links); t.priority={important:Boolean(input.important),urgent:Boolean(input.urgent)}; t.first_step=String(input.first_step||'').trim().slice(0,500); t.next_action=['now','next','later'].includes(input.next_action)?input.next_action:'later'; t.tags.forEach((n,i)=>{this.data.tags[n]??=TAG_COLORS[i%TAG_COLORS.length]});
     this.data.tasks.unshift(t); return t;
   }
   editTask(input) {
     const t = this.task(input.id);
-    t.tags = tags(input.tags ?? t.tags);
+    t.tags = tags(input.tags ?? t.tags); t.links=links(input.links ?? t.links); t.priority={important:Boolean(input.important ?? t.priority?.important),urgent:Boolean(input.urgent ?? t.priority?.urgent)}; t.first_step=String(input.first_step ?? t.first_step ?? '').trim().slice(0,500); t.next_action=['now','next','later'].includes(input.next_action)?input.next_action:(t.next_action||'later'); t.tags.forEach((n,i)=>{this.data.tags[n]??=TAG_COLORS[i%TAG_COLORS.length]});
     t.name = required(input.name); t.memo = String(input.memo || '').slice(0, 4000); t.updated_at = this.iso();
     if (this.data.active?.task_id === t.id) this.data.active.task_name = t.name;
     for (const s of this.data.suspended) if (s.task_id === t.id) s.task_name = t.name;
@@ -65,7 +67,7 @@ class Store {
     const t = this.task(id);
     if (this.data.active?.task_id === id || this.data.suspended.some(s => s.task_id === id)) throw Error('作業を終了してからタスクを完了してください。');
     t.completed = !t.completed; t.completed_at = t.completed ? this.iso() : null; t.updated_at = this.iso();
-    if (t.completed) this.event('task_completed', { task_id: id });
+    if (t.completed) this.event('task_completed', { task_id: id, task_name: t.name });
   }
   deleteTask(id) {
     this.task(id);
@@ -77,7 +79,7 @@ class Store {
     if (this.data.suspended.some(s => s.task_id === input.task_id)) throw Error('中断中の作業を再開してください。');
     const t = this.task(input.task_id);
     if (t.completed) throw Error('未完了のタスクを選んでください。');
-    this.data.active = { id: randomUUID(), task_id: t.id, task_name: t.name, status: 'running', started_at: this.iso(), ended_at: null, elapsed_ms: 0, running_since: this.clock(), heartbeat: this.clock() };
+    this.data.active = { id: randomUUID(), task_id: t.id, task_name: t.name, first_step:t.first_step||'', status: 'running', started_at: this.iso(), ended_at: null, elapsed_ms: 0, running_since: this.clock(), heartbeat: this.clock() };
     this.event('session_started', { task_name: t.name });
   }
   suspend(action = 'user') {
@@ -130,6 +132,11 @@ class Store {
     this.event('session_completed', { duration_seconds: duration, action });
     this.data.sessions.unshift(s); this.data.active = null;
   }
+  setPriority(id,important,urgent){const t=this.task(id);t.priority={important:Boolean(important),urgent:Boolean(urgent)};t.updated_at=this.iso();}
+  setNextAction(id,v){const t=this.task(id);if(!['now','next','later'].includes(v))throw Error('着手区分が不正です。');if(v==='now'&&this.data.tasks.some(x=>x.next_action==='now'&&x.id!==id))throw Error('「今やる」は1件だけ選べます。');if(v==='next'&&this.data.tasks.filter(x=>x.next_action==='next'&&x.id!==id).length>=3)throw Error('「次にやる」は3件までです。');t.next_action=v;t.updated_at=this.iso();}
+  addQuickNote(text){const n={id:randomUUID(),text:required(text,500),created_at:this.iso(),status:'inbox'};this.data.quick_notes.unshift(n);this.event('quick_note_added',{note_id:n.id});return n;}
+  updateQuickNote(id,a){const n=this.data.quick_notes.find(x=>x.id===id);if(!n)throw Error('クイックメモが見つかりません。');if(a==='delete')this.data.quick_notes=this.data.quick_notes.filter(x=>x.id!==id);else if(['inbox','later'].includes(a))n.status=a;else throw Error('操作が不正です。');}
   exportJSONL() { return this.data.events.map(e => JSON.stringify(e)).join('\n') + (this.data.events.length ? '\n' : ''); }
 }
 module.exports = { Store };
+

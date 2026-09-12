@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, session } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, screen, dialog, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { Store } = require('./core.cjs');
@@ -51,6 +51,8 @@ function mutate(action, input) {
     switch (action) {
       case 'task:create': return store.createTask(input);
       case 'task:edit': return store.editTask(input);
+      case 'task:priority': return store.setPriority(input.id,input.important,input.urgent);
+      case 'task:next-action': return store.setNextAction(input.id,input.value);
       case 'task:complete': return store.completeTask(input.id);
       case 'task:delete': return store.deleteTask(input.id);
       case 'session:start': return store.start(input);
@@ -61,6 +63,8 @@ function mutate(action, input) {
       case 'session:resume': return store.resume();
       case 'session:end': return store.end();
       case 'settings:overlay': store.data.settings.overlay = Boolean(input.visible); return;
+      case 'quick-note:add': return store.addQuickNote(input.text);
+      case 'quick-note:update': return store.updateQuickNote(input.id,input.action);
       default: throw Error('未対応の操作です。');
     }
   });
@@ -116,3 +120,4 @@ else {
   });
   app.on('window-all-closed', () => app.quit());
 }
+
